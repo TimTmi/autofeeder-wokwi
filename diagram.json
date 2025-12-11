@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "author": "Nguyễn Kiến Hào",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-breadboard", "id": "bb1", "top": -137.4, "left": -112.4, "attrs": {} },
+    { "type": "board-esp32-devkit-v1", "id": "esp", "top": 83.68, "left": -168, "attrs": {} },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic1",
+      "top": 168.3,
+      "left": -8.7,
+      "rotate": 90,
+      "attrs": { "distance": "47" }
+    },
+    {
+      "type": "wokwi-hx711",
+      "id": "cell1",
+      "top": 175.4,
+      "left": 261.8,
+      "attrs": { "type": "5kg" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "esp:5V", "bb1:bp.1", "green", [ "h-28.65", "v-287.1" ] ],
+    [ "ultrasonic1:TRIG", "esp:5", "green", [ "h-76.8", "v-10" ] ],
+    [ "ultrasonic1:ECHO", "esp:4", "green", [ "h-76.8", "v8.8" ] ],
+    [ "ultrasonic1:VCC", "bb1:bp.2", "red", [ "h-48", "v-163.2", "h-37.6" ] ],
+    [ "ultrasonic1:GND", "bb1:bn.2", "red", [ "h-67.2", "v-154.8", "h-18.4" ] ],
+    [ "ultrasonic1:ECHO", "esp:D4", "green", [ "h-48", "v-17.28" ] ],
+    [ "esp:D2", "ultrasonic1:TRIG", "green", [ "h0" ] ],
+    [ "esp:VIN", "bb1:bp.1", "red", [ "h-28.84", "v-193.82" ] ],
+    [ "esp:GND.2", "bb1:bn.1", "red", [ "h-19.2", "v-171.5" ] ],
+    [ "cell1:GND", "bb1:bn.3", "red", [ "h-115.2", "v-105.9", "h-200.8" ] ],
+    [ "cell1:VCC", "bb1:bp.3", "red", [ "h-48", "v-192", "h-268" ] ],
+    [ "cell1:SCK", "esp:D5", "green", [ "h-115.2", "v-0.8" ] ],
+    [ "esp:D18", "cell1:DT", "green", [ "h258.71", "v48" ] ]
+  ],
+  "dependencies": {}
+}
