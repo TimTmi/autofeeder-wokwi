@@ -43,6 +43,14 @@ void foodAmount() {
 
 void setupWifiManager() {
   WiFiManager wifiManager;
+
+  if (!wifiManager.autoConnect("autofeeder", "connectNOWBRO")) {
+    Serial.println("wifi failed, rebooting...");
+    ESP.restart();
+    delay(1306);
+  }
+
+  Serial.println("wifi connected");
 }
 
 void setup() {
@@ -52,6 +60,8 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   scale.begin(HX_DOUT, HX_SCK);
+
+  setupWifiManager();
 }
 
 void loop() {
