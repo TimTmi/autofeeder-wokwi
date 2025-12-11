@@ -1,11 +1,15 @@
-#include "HX711.h"
+#include <Arduino.h>
+
+#include <HX711.h>
+#include <WiFi.h>
+#include <WiFiManager.h>
 
 #define TRIG_PIN 2
 #define ECHO_PIN 4
 
 // HX711 pins
 #define HX_DOUT 18   // DT pin
-#define HX_SCK   5   // SCK pin
+#define HX_SCK 5     // SCK pin
 
 HX711 scale;
 
@@ -71,6 +75,14 @@ void tareScale() {
 //-----------------------------------------
 // Setup & Loop
 //-----------------------------------------
+//-----------------------------------------
+// Setup & Loop
+//-----------------------------------------
+
+void setupWifiManager() {
+  WiFiManager wifiManager;
+}
+
 void setup() {
   Serial.begin(9600);
 
