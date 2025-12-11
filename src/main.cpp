@@ -37,6 +37,44 @@ void foodAmount() {
   }
 }
 
+
+//-----------------------------------------
+// Weight Measurement (grams)
+//-----------------------------------------
+
+long zeroOffset = 0;              // measured when empty
+float calibrationFactor = 0.42;
+
+// Read one raw value
+long readRaw() {
+  return scale.read();
+}
+
+// Compute grams
+float getWeightGrams() {
+  long raw = readRaw();
+  long adjusted = raw - zeroOffset;
+  float grams = adjusted / calibrationFactor;
+  return grams;
+}
+
+// Compute zeroOffset
+void tareScale() {
+  long sum = 0;
+  const int samples = 10;
+
+  for (int i = 0; i < samples; i++) {
+    sum += readRaw();
+    delay(10);
+  }
+
+  zeroOffset = sum / samples;
+}
+
+
+//-----------------------------------------
+// Setup & Loop
+//-----------------------------------------
 //-----------------------------------------
 // Setup & Loop
 //-----------------------------------------
@@ -60,19 +98,23 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   scale.begin(HX_DOUT, HX_SCK);
-
   setupWifiManager();
+
+  Serial.println("Taring scale...");
+  tareScale();
+  Serial.print("Zero offset = ");
+  Serial.println(zeroOffset);
 }
 
 void loop() {
-  // Print distance info
+  // Distance output
   foodAmount();
 
-  // Check if HX711 has data
+  // Weight output
   if (scale.is_ready()) {
-    long reading = scale.read();    // raw units
-    Serial.print("Raw weight reading: ");
-    Serial.println(reading);
+    float grams = getWeightGrams();
+    Serial.print("Weight (g): ");
+    Serial.println(grams);
   } else {
     Serial.println("HX711 not ready");
   }
