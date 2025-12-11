@@ -130,10 +130,19 @@ void setTargetPortionFromUser() {
   Serial.println(targetPortionGrams);
 }
 
+//-----------------------------------------
+// Setup & Loop
+//-----------------------------------------
 
-//-----------------------------------------
-// SETUP & LOOP
-//-----------------------------------------
+void startWokwiWifi() {
+  WiFi.begin("Wokwi-GUEST", "");
+  Serial.print("wifi connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(600);
+    Serial.print(".");
+  }
+  Serial.println("\nwifi connected");
+}
 
 void setupWifiManager() {
   WiFiManager wifiManager;
@@ -154,7 +163,8 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   scale.begin(HX_DOUT, HX_SCK);
-  setupWifiManager();
+  // setupWifiManager();
+  startWokwiWifi();
 
   Serial.println("Taring scale...");
   tareScale();
