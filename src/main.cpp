@@ -63,6 +63,13 @@ float getWeightGrams() {
   return grams;
 }
 
+// -------------------- Smoothed Weight --------------------
+float getSmoothedWeight() {
+  float current = getWeightGrams();
+  smoothedWeight = alpha * current + (1 - alpha) * smoothedWeight;
+  return smoothedWeight;
+}
+
 // -------------------- Tare / Zero --------------------
 void tareScale() {
   long sum = 0;
@@ -87,47 +94,34 @@ void setUserPortion() {
   smoothedWeight = targetPortionGrams;
 }
 
-// -------------------- Smoothed Weight --------------------
-float getSmoothedWeight() {
-  float current = getWeightGrams();
-  smoothedWeight = alpha * current + (1 - alpha) * smoothedWeight;
-  return smoothedWeight;
-}
-
 // -------------------- Portion Check --------------------
 bool portionReached() {
   float current = getSmoothedWeight();   // use smoothed weight
   return current >= targetPortionGrams;
 }
 
-// -------------------- TESTING WEIGHT SENSOR --------------------
-float readPortionFromSerial() {
-  float value = 0;
-  
-  // Wait until data is available
-  while (Serial.available() == 0) {
-    // do nothing
-  }
+// -------------------- Desired Portion Configuration --------------------
+void setPortionFromBowl() {
+    const float threshold = 0.2; // grams change threshold for “stable reading”
+    float lastWeight = getSmoothedWeight();
+    float stableTime = 0;
 
-  // Read the number
-  value = Serial.parseFloat();
+    // Wait until the weight reading is stable
+    while (stableTime < 1000) { // total stable duration: 1 second
+        float current = getSmoothedWeight();
+        if (abs(current - lastWeight) < threshold) {
+            stableTime += 50; // increment stable duration
+        } else {
+            stableTime = 0;   // reset if weight changes
+        }
+        lastWeight = current;
+        delay(50);
+    }
 
-  // Clear any leftover characters
-  Serial.readStringUntil('\n');
-
-  return value;
-}
-
-void setTargetPortionFromUser() {
-  Serial.println("Enter desired portion in grams:");
-  float inputGrams = readPortionFromSerial();
-  targetPortionGrams = inputGrams;
-
-  // Optional: initialize smoothing
-  smoothedWeight = targetPortionGrams;
-
-  Serial.print("Target portion set to: ");
-  Serial.println(targetPortionGrams);
+    targetPortionGrams = lastWeight;
+    Serial.print("Target portion set to: ");
+    Serial.print(targetPortionGrams);
+    Serial.println(" grams");
 }
 
 //-----------------------------------------
@@ -166,12 +160,12 @@ void setup() {
   // setupWifiManager();
   startWokwiWifi();
 
-  Serial.println("Taring scale...");
+  Serial.println("Calibrating machine...");
   tareScale();
-  Serial.print("Zero offset = ");
-  Serial.println(zeroOffset);
+  Serial.println("DONE!");
+  Serial.println("Use load cell to set desired portion now...");
   // Ask user to input target portion
-  setTargetPortionFromUser();
+  setPortionFromBowl();
 }
 
 void loop() {
@@ -180,11 +174,6 @@ void loop() {
 
   // Weight output
   if (scale.is_ready()) {
-    // Read raw weight
-    long raw = readRaw();
-    Serial.print("Raw reading: ");
-    Serial.println(raw);
-
     // Smoothed weight
     float grams = getSmoothedWeight();
     Serial.print("Smoothed weight (g): ");
@@ -206,5 +195,5 @@ void loop() {
   }
 
   Serial.println("------------------------");
-  delay(500);
+  delay(200);
 }
