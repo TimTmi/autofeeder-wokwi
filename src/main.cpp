@@ -124,8 +124,56 @@ void setPortionFromBowl() {
     Serial.println(" grams");
 }
 
+// -------------------- Test Portion Set With Serial Monitor Input --------------------
+float readPortionFromSerial() {
+  float value = 0;
+  
+  // Wait until data is available
+  while (Serial.available() == 0) {
+    // do nothing
+  }
+
+  // Read the number
+  value = Serial.parseFloat();
+
+  // Clear any leftover characters
+  Serial.readStringUntil('\n');
+
+  return value;
+}
+
+void setTargetPortionFromUser() {
+  Serial.println("Enter desired portion in grams:");
+  float inputGrams = readPortionFromSerial();
+  targetPortionGrams = inputGrams;
+
+  // Optional: initialize smoothing
+  smoothedWeight = targetPortionGrams;
+
+  Serial.print("Target portion set to: ");
+  Serial.println(targetPortionGrams);
+}
+
+// -------------------- Calibrate Bowl Web Command --------------------
+void webTareCommand() {
+    tareScale();
+    Serial.println("Scale tared.");
+}
+
+void confirmUserPortion() {
+    // Capture instantaneous weight (no smoothing lag)
+    float grams = getWeightGrams();    
+
+    targetPortionGrams = grams;
+    smoothedWeight = grams;  // keep smoothed readings aligned
+
+    Serial.print("User-confirmed portion: ");
+    Serial.print(targetPortionGrams);
+    Serial.println(" g");
+}
+
 //-----------------------------------------
-// Setup & Loop
+// WIFI MANAGER
 //-----------------------------------------
 
 void startWokwiWifi() {
@@ -150,6 +198,10 @@ void setupWifiManager() {
   Serial.println("wifi connected");
 }
 
+//-----------------------------------------
+// SETUP & LOOP
+//-----------------------------------------
+
 void setup() {
   Serial.begin(9600);
 
@@ -162,9 +214,11 @@ void setup() {
 
   Serial.println("Calibrating machine...");
   tareScale();
+  //Serial.println(zeroOffset);
   Serial.println("DONE!");
   Serial.println("Use load cell to set desired portion now...");
-  // Ask user to input target portion
+  // Ask user to input target portion (by input from serial monitor or using the load cell in Wokwi, call the appropriate function)
+  // setTargetPortionFromUser();
   setPortionFromBowl();
 }
 

@@ -30,7 +30,9 @@
       "id": "cell1",
       "top": 175.4,
       "left": 261.8,
-      "attrs": { "type": "5kg" }
+      "attrs": { 
+        "type": "5kg" 
+      }
     }
   ],
   "connections": [
