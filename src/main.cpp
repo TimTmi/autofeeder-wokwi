@@ -1,253 +1,185 @@
 #include <Arduino.h>
-
-#include <HX711.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <Preferences.h>
 
-#define TRIG_PIN 2
-#define ECHO_PIN 4
+#include "MQTTManager.h"
+#include "Storage.h"
+#include "WeightSensor.h"
+#include "Dispenser.h"
 
-// HX711 pins
-#define HX_DOUT 18   // DT pin
-#define HX_SCK 5     // SCK pin
+// -----------------------------
+// Pin configuration
+// -----------------------------
+constexpr int trig = 2;
+constexpr int echo = 4;
+constexpr int dt = 18;
+constexpr int sck = 5;
+constexpr int SERVO_PIN = 19;
 
-HX711 scale;
+// -----------------------------
+// WiFi configuration
+// -----------------------------
+WiFiClientSecure espClient;
 
-//-----------------------------------------
-// DISTANCE MEASUREMENT
-//-----------------------------------------
-float getDistance() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
+// -----------------------------
+// MQTT configuration
+// -----------------------------
+constexpr char mqttHost[] = "a63c6d5a32cf4a67b9d6a209a8e13525.s1.eu.hivemq.cloud";
+constexpr int mqttPort = 8883;
+constexpr char mqttUsername[] = "tmitmi";
+constexpr char mqttPassword[] = "Tm123456";
+PubSubClient client(espClient);
 
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distance = duration * 0.0343 / 2;
+// -----------------------------
+// Global instances
+// -----------------------------
+MQTTManager mqttManager(client);
+Storage storage(2.0f, 20.0f, 2000.0f);
+WeightSensor weightSensor;
+Dispenser dispenser(SERVO_PIN);
 
-  return distance;
+// -----------------------------
+// Feeder ID
+// -----------------------------
+
+Preferences prefs;
+String feederId;
+
+String generateFeederId() {
+    uint64_t mac = ESP.getEfuseMac();
+    uint32_t id = (uint32_t)(mac & 0xFFFFFF); // lower 24 bits
+    char buf[7];
+    snprintf(buf, sizeof(buf), "%06X", id);
+    return String(buf);
 }
 
-void foodAmount() {
-  if (getDistance() >= 35) {
-    Serial.println("Running out of food!");
-  } else {
-    Serial.println("OKAY");
-  }
+String loadOrCreateFeederId() {
+    prefs.begin("feeder", false);
+    String id = prefs.getString("id", "");
+
+    if (id.length() == 0) {
+        id = generateFeederId();
+        prefs.putString("id", id);
+    }
+
+    prefs.end();
+    return id;
 }
 
+// -----------------------------
+// Wi-Fi setup
+// -----------------------------
 
-//-----------------------------------------
-// WEIGHT MEASUREMENT (GRAMS)
-//-----------------------------------------
+bool startWifi() {
+    Serial.println("Starting Wi-Fi priority sequence...");
 
-long zeroOffset = 0;
-float calibrationFactor = 0.42;
+    WiFi.mode(WIFI_STA);
 
-float targetPortionGrams = 0;  // User-defined full amount
-
-// For smoothing
-float smoothedWeight = 0;  
-float alpha = 0.2;          // smoothing factor (0 < alpha <= 1)
-
-// -------------------- Raw Readings --------------------
-long readRaw() {
-  return scale.read();
-}
-
-float getWeightGrams() {
-  long raw = readRaw();
-  long adjusted = raw - zeroOffset;
-  float grams = adjusted / calibrationFactor;
-  return grams;
-}
-
-// -------------------- Smoothed Weight --------------------
-float getSmoothedWeight() {
-  float current = getWeightGrams();
-  smoothedWeight = alpha * current + (1 - alpha) * smoothedWeight;
-  return smoothedWeight;
-}
-
-// -------------------- Tare / Zero --------------------
-void tareScale() {
-  long sum = 0;
-  const int samples = 20;
-
-  for (int i = 0; i < samples; i++) {
-    sum += readRaw();
-    delay(10);
-  }
-
-  zeroOffset = sum / samples;
-
-  // Initialize smoothedWeight after taring
-  smoothedWeight = getWeightGrams();
-}
-
-// -------------------- Portion Setting --------------------
-void setUserPortion() {
-  targetPortionGrams = getWeightGrams();
-
-  // Optional: reset smoothing
-  smoothedWeight = targetPortionGrams;
-}
-
-// -------------------- Portion Check --------------------
-bool portionReached() {
-  float current = getSmoothedWeight();   // use smoothed weight
-  return current >= targetPortionGrams;
-}
-
-// -------------------- Desired Portion Configuration --------------------
-void setPortionFromBowl() {
-    const float threshold = 0.2; // grams change threshold for “stable reading”
-    float lastWeight = getSmoothedWeight();
-    float stableTime = 0;
-
-    // Wait until the weight reading is stable
-    while (stableTime < 1000) { // total stable duration: 1 second
-        float current = getSmoothedWeight();
-        if (abs(current - lastWeight) < threshold) {
-            stableTime += 50; // increment stable duration
-        } else {
-            stableTime = 0;   // reset if weight changes
+    // --- 1. Try Wokwi-GUEST first ---
+    Serial.print("Trying Wokwi-GUEST...");
+    WiFi.begin("Wokwi-GUEST");
+    unsigned long start = millis();
+    unsigned long lastPrint = start;
+    while (WiFi.status() != WL_CONNECTED) {
+        unsigned long now = millis();
+        if (now - start >= 5000) break;   // 5s timeout
+        if (now - lastPrint >= 500) {
+            Serial.print(".");
+            lastPrint = now;
         }
-        lastWeight = current;
-        delay(50);
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to Wokwi-GUEST");
+        return true;
     }
 
-    targetPortionGrams = lastWeight;
-    Serial.print("Target portion set to: ");
-    Serial.print(targetPortionGrams);
-    Serial.println(" grams");
+    // --- 2. Try saved credentials ---
+    Serial.print("\nTrying saved Wi-Fi credentials...");
+    WiFi.begin(); // attempt stored SSID/password
+    start = millis();
+    lastPrint = start;
+    while (WiFi.status() != WL_CONNECTED) {
+        unsigned long now = millis();
+        if (now - start >= 8000) break;   // 8s timeout
+        if (now - lastPrint >= 500) {
+            Serial.print(".");
+            lastPrint = now;
+        }
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to saved Wi-Fi");
+        return true;
+    }
+
+    // --- 3. Fall back to WiFiManager portal ---
+    Serial.println("\nSaved credentials failed, starting config portal...");
+    WiFiManager wm;
+    wm.setConfigPortalTimeout(60);
+    wm.setDebugOutput(false);
+
+    String suffix = feederId.length() > 6 ? feederId.substring(feederId.length() - 6) : feederId;
+    String apName = "AutoFeeder-" + suffix;
+
+    if (!wm.autoConnect(apName.c_str(), "connectNOWBRO")) {
+        Serial.println("WiFiManager portal failed");
+        return false;
+    }
+
+    Serial.println("Connected via WiFiManager portal");
+    return true;
 }
 
-// -------------------- Test Portion Set With Serial Monitor Input --------------------
-float readPortionFromSerial() {
-  float value = 0;
-  
-  // Wait until data is available
-  while (Serial.available() == 0) {
-    // do nothing
-  }
-
-  // Read the number
-  value = Serial.parseFloat();
-
-  // Clear any leftover characters
-  Serial.readStringUntil('\n');
-
-  return value;
-}
-
-void setTargetPortionFromUser() {
-  Serial.println("Enter desired portion in grams:");
-  float inputGrams = readPortionFromSerial();
-  targetPortionGrams = inputGrams;
-
-  // Optional: initialize smoothing
-  smoothedWeight = targetPortionGrams;
-
-  Serial.print("Target portion set to: ");
-  Serial.println(targetPortionGrams);
-}
-
-// -------------------- Calibrate Bowl Web Command --------------------
-void webTareCommand() {
-    tareScale();
-    Serial.println("Scale tared.");
-}
-
-void confirmUserPortion() {
-    // Capture instantaneous weight (no smoothing lag)
-    float grams = getWeightGrams();    
-
-    targetPortionGrams = grams;
-    smoothedWeight = grams;  // keep smoothed readings aligned
-
-    Serial.print("User-confirmed portion: ");
-    Serial.print(targetPortionGrams);
-    Serial.println(" g");
-}
-
-//-----------------------------------------
-// WIFI MANAGER
-//-----------------------------------------
-
-void startWokwiWifi() {
-  WiFi.begin("Wokwi-GUEST", "");
-  Serial.print("wifi connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(600);
-    Serial.print(".");
-  }
-  Serial.println("\nwifi connected");
-}
-
-void setupWifiManager() {
-  WiFiManager wifiManager;
-
-  if (!wifiManager.autoConnect("autofeeder", "connectNOWBRO")) {
-    Serial.println("wifi failed, rebooting...");
-    ESP.restart();
-    delay(1306);
-  }
-
-  Serial.println("wifi connected");
-}
-
-//-----------------------------------------
-// SETUP & LOOP
-//-----------------------------------------
-
+// -----------------------------
+// Setup
+// -----------------------------
 void setup() {
-  Serial.begin(9600);
+    Serial.begin(9600);
+    Serial.println("setting up...");
 
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+    feederId = loadOrCreateFeederId();
 
-  scale.begin(HX_DOUT, HX_SCK);
-  // setupWifiManager();
-  startWokwiWifi();
+    pinMode(trig, OUTPUT);
+    pinMode(echo, INPUT);
 
-  Serial.println("Calibrating machine...");
-  tareScale();
-  //Serial.println(zeroOffset);
-  Serial.println("DONE!");
-  Serial.println("Use load cell to set desired portion now...");
-  // Ask user to input target portion (by input from serial monitor or using the load cell in Wokwi, call the appropriate function)
-  // setTargetPortionFromUser();
-  setPortionFromBowl();
+    Serial.println("feeder id: " + feederId);
+    
+    weightSensor.setup(dt, sck);
+    dispenser.setup();
+    
+    if (!startWifi()) {
+        Serial.println("restarting...");
+        ESP.restart();
+    }
+    
+    espClient.setInsecure();
+    
+    // Initialize MQTT system
+    Serial.println("setting up mqtt...");
+    mqttManager.setup(
+        mqttHost, mqttPort, mqttUsername, mqttPassword,
+        feederId.c_str(),
+        feederId
+    );
+    Serial.println("done");
 }
 
+// -----------------------------
+// Main loop
+// -----------------------------
 void loop() {
-  // Distance output
-  foodAmount();
+    // Update MQTT
+    mqttManager.loop();
 
-  // Weight output
-  if (scale.is_ready()) {
-    // Smoothed weight
-    float grams = getSmoothedWeight();
-    Serial.print("Smoothed weight (g): ");
-    Serial.println(grams);
+    // Update dispenser
+    dispenser.loop();
 
-    // Portion reached (if target portion is set)
-    if (targetPortionGrams > 0) {
-      Serial.print("Target portion (g): ");
-      Serial.println(targetPortionGrams);
-
-      if (portionReached()) {
-        Serial.println("Portion reached!");
-      } else {
-        Serial.println("Portion not yet reached.");
-      }
+    // Basic monitoring
+    if (weightSensor.isReady()) {
+        Serial.print("Weight (g): ");
+        Serial.println(weightSensor.getSmoothedWeight());
     }
-  } else {
-    Serial.println("HX711 not ready");
-  }
 
-  Serial.println("------------------------");
-  delay(200);
+    // mqttManager.publish("event", "fed");
 }
