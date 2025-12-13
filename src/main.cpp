@@ -1,131 +1,187 @@
 #include <Arduino.h>
-
-#include <HX711.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <Preferences.h>
 
-#define TRIG_PIN 2
-#define ECHO_PIN 4
+#include "MQTTManager.h"
+#include "Storage.h"
+#include "WeightSensor.h"
+#include "Dispenser.h"
 
-// HX711 pins
-#define HX_DOUT 18   // DT pin
-#define HX_SCK 5     // SCK pin
+// -----------------------------
+// Pin configuration
+// -----------------------------
+constexpr int trig = 2;
+constexpr int echo = 4;
+constexpr int dt = 18;
+constexpr int sck = 5;
+constexpr int SERVO_PIN = 19;
 
-HX711 scale;
+// -----------------------------
+// WiFi configuration
+// -----------------------------
+WiFiClientSecure espClient;
 
-//-----------------------------------------
-// Distance Measurement
-//-----------------------------------------
-float getDistance() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
+// -----------------------------
+// MQTT configuration
+// -----------------------------
+constexpr char mqttHost[] = "a63c6d5a32cf4a67b9d6a209a8e13525.s1.eu.hivemq.cloud";
+constexpr int mqttPort = 8883;
+constexpr char mqttUsername[] = "tmitmi";
+constexpr char mqttPassword[] = "Tm123456";
+PubSubClient client(espClient);
 
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distance = duration * 0.0343 / 2;
+// -----------------------------
+// Global instances
+// -----------------------------
+MQTTManager mqttManager(client);
+Storage storage(2.0f, 20.0f, 2000.0f);
+WeightSensor weightSensor;
+Dispenser dispenser(SERVO_PIN);
 
-  return distance;
+// -----------------------------
+// Feeder ID
+// -----------------------------
+
+Preferences prefs;
+String feederId;
+
+String generateFeederId() {
+    uint64_t mac = ESP.getEfuseMac();
+    uint32_t id = (uint32_t)(mac & 0xFFFFFF); // lower 24 bits
+    char buf[7];
+    snprintf(buf, sizeof(buf), "%06X", id);
+    return String(buf);
 }
 
-void foodAmount() {
-  if (getDistance() >= 35) {
-    Serial.println("Running out of food!");
-  } else {
-    Serial.println("OKAY");
-  }
+String loadOrCreateFeederId() {
+    prefs.begin("feeder", false);
+    String id = prefs.getString("id", "");
+
+    if (id.length() == 0) {
+        id = generateFeederId();
+        prefs.putString("id", id);
+    }
+
+    prefs.end();
+    return id;
+}
+
+// -----------------------------
+// Wi-Fi setup
+// -----------------------------
+
+bool startWifi() {
+    Serial.println("Starting Wi-Fi priority sequence...");
+
+    WiFi.mode(WIFI_STA);
+
+    // --- 1. Try Wokwi-GUEST first ---
+    Serial.print("Trying Wokwi-GUEST...");
+    WiFi.begin("Wokwi-GUEST");
+    unsigned long start = millis();
+    unsigned long lastPrint = start;
+    while (WiFi.status() != WL_CONNECTED) {
+        unsigned long now = millis();
+        if (now - start >= 5000) break;   // 5s timeout
+        if (now - lastPrint >= 500) {
+            Serial.print(".");
+            lastPrint = now;
+        }
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to Wokwi-GUEST");
+        return true;
+    }
+
+    // --- 2. Try saved credentials ---
+    Serial.print("\nTrying saved Wi-Fi credentials...");
+    WiFi.begin(); // attempt stored SSID/password
+    start = millis();
+    lastPrint = start;
+    while (WiFi.status() != WL_CONNECTED) {
+        unsigned long now = millis();
+        if (now - start >= 8000) break;   // 8s timeout
+        if (now - lastPrint >= 500) {
+            Serial.print(".");
+            lastPrint = now;
+        }
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to saved Wi-Fi");
+        return true;
+    }
+
+    // --- 3. Fall back to WiFiManager portal ---
+    Serial.println("\nSaved credentials failed, starting config portal...");
+    WiFiManager wm;
+    wm.setConfigPortalTimeout(60);
+    wm.setDebugOutput(false);
+
+    String suffix = feederId.length() > 6 ? feederId.substring(feederId.length() - 6) : feederId;
+    String apName = "AutoFeeder-" + suffix;
+
+    if (!wm.autoConnect(apName.c_str(), "connectNOWBRO")) {
+        Serial.println("WiFiManager portal failed");
+        return false;
+    }
+
+    Serial.println("Connected via WiFiManager portal");
+    return true;
 }
 
 
-//-----------------------------------------
-// Weight Measurement (grams)
-//-----------------------------------------
 
-long zeroOffset = 0;              // measured when empty
-float calibrationFactor = 0.42;
-
-// Read one raw value
-long readRaw() {
-  return scale.read();
-}
-
-// Compute grams
-float getWeightGrams() {
-  long raw = readRaw();
-  long adjusted = raw - zeroOffset;
-  float grams = adjusted / calibrationFactor;
-  return grams;
-}
-
-// Compute zeroOffset
-void tareScale() {
-  long sum = 0;
-  const int samples = 10;
-
-  for (int i = 0; i < samples; i++) {
-    sum += readRaw();
-    delay(10);
-  }
-
-  zeroOffset = sum / samples;
-}
-
-//-----------------------------------------
-// Setup & Loop
-//-----------------------------------------
-
-void startWokwiWifi() {
-  WiFi.begin("Wokwi-GUEST", "");
-  Serial.print("wifi connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(600);
-    Serial.print(".");
-  }
-  Serial.println("\nwifi connected");
-}
-
-void setupWifiManager() {
-  WiFiManager wifiManager;
-
-  if (!wifiManager.autoConnect("autofeeder", "connectNOWBRO")) {
-    Serial.println("wifi failed, rebooting...");
-    ESP.restart();
-    delay(1306);
-  }
-
-  Serial.println("wifi connected");
-}
-
+// -----------------------------
+// Setup
+// -----------------------------
 void setup() {
-  Serial.begin(9600);
+    Serial.begin(9600);
+    Serial.println("setting up...");
 
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+    feederId = loadOrCreateFeederId();
 
-  scale.begin(HX_DOUT, HX_SCK);
-  // setupWifiManager();
-  startWokwiWifi();
+    pinMode(trig, OUTPUT);
+    pinMode(echo, INPUT);
 
-  Serial.println("Taring scale...");
-  tareScale();
-  Serial.print("Zero offset = ");
-  Serial.println(zeroOffset);
+    Serial.println("feeder id: " + feederId);
+    
+    weightSensor.setup(dt, sck);
+    dispenser.setup();
+    
+    if (!startWifi()) {
+        Serial.println("restarting...");
+        ESP.restart();
+    }
+    
+    espClient.setInsecure();
+    
+    // Initialize MQTT system
+    Serial.println("setting up mqtt...");
+    mqttManager.setup(
+        mqttHost, mqttPort, mqttUsername, mqttPassword,
+        feederId.c_str(),
+        feederId
+    );
+    Serial.println("done");
 }
 
+// -----------------------------
+// Main loop
+// -----------------------------
 void loop() {
-  // Distance output
-  foodAmount();
+    // Update MQTT
+    mqttManager.loop();
 
-  // Weight output
-  if (scale.is_ready()) {
-    float grams = getWeightGrams();
-    Serial.print("Weight (g): ");
-    Serial.println(grams);
-  } else {
-    Serial.println("HX711 not ready");
-  }
+    // Update dispenser
+    dispenser.loop();
 
-  Serial.println("------------------------");
-  delay(500);
+    // Basic monitoring
+    if (weightSensor.isReady()) {
+        Serial.print("Weight (g): ");
+        Serial.println(weightSensor.getWeight());
+    }
+
+    // mqttManager.publish("event", "fed");
 }
