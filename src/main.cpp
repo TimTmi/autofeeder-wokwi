@@ -131,8 +131,6 @@ bool startWifi() {
     return true;
 }
 
-
-
 // -----------------------------
 // Setup
 // -----------------------------
@@ -180,7 +178,7 @@ void loop() {
     // Basic monitoring
     if (weightSensor.isReady()) {
         Serial.print("Weight (g): ");
-        Serial.println(weightSensor.getWeight());
+        Serial.println(weightSensor.getSmoothedWeight());
     }
 
     // mqttManager.publish("event", "fed");
