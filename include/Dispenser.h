@@ -16,6 +16,7 @@ public:
     void setup();
     void loop();
     bool dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void));
+    bool dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void));
 
     State getState() const;
     void reset();
@@ -34,4 +35,6 @@ private:
 
     unsigned long startTime = 0;
     unsigned long timeout;
+    unsigned long doneTime = 0;
+    unsigned long errorTime = 0;
 };

@@ -23,7 +23,7 @@
       "top": 168.3,
       "left": -8.7,
       "rotate": 90,
-      "attrs": { "distance": "47" }
+      "attrs": { "distance": "10" }
     },
     {
       "type": "wokwi-hx711",

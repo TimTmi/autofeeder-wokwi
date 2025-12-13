@@ -108,3 +108,17 @@ void WeightSensor::confirmUserPortion() {
     Serial.print("User-confirmed portion: ");
     Serial.println(targetPortionGrams);
 }
+
+float WeightSensor::getTargetPortion() const {
+    return targetPortionGrams;
+}
+
+void WeightSensor::setTargetPortion(float grams) {
+    if (grams >= 0) {
+        targetPortionGrams = grams;
+    }
+}
+
+bool WeightSensor::hasFoodInBowl(float thresholdGrams) const {
+    return smoothedWeight > thresholdGrams;
+}

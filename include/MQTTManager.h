@@ -17,6 +17,10 @@ public:
     void loop();
 
     bool publish(const String& sub, const String& payload, bool retained = false);
+    void publishBowlStatus();
+    void publishTargetPortion();
+    void publishWeight();
+    void publishStorageStatus();
 
 private:
     PubSubClient& client;

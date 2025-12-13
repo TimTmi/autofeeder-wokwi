@@ -45,4 +45,7 @@ public:
     float readPortionFromSerial();
     void setTargetPortionFromUser();
     void confirmUserPortion();
+    float getTargetPortion() const;
+    void setTargetPortion(float grams);
+    bool hasFoodInBowl(float thresholdGrams = 5.0f) const;
 };

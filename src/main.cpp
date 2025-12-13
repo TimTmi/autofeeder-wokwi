@@ -36,7 +36,7 @@ PubSubClient client(espClient);
 // Global instances
 // -----------------------------
 MQTTManager mqttManager(client);
-Storage storage(2.0f, 20.0f, 2000.0f);
+Storage storage(2.0f, 50.0f, 2000.0f);  // minDist=2cm (full), maxDist=50cm (empty), maxWeight=2000g
 WeightSensor weightSensor;
 Dispenser dispenser(SERVO_PIN);
 
@@ -132,6 +132,194 @@ bool startWifi() {
 }
 
 // -----------------------------
+// Ultrasonic sensor reading
+// -----------------------------
+float readUltrasonicDistance() {
+    // Clear trigger pin
+    digitalWrite(trig, LOW);
+    delayMicroseconds(2);
+    
+    // Send 10μs HIGH pulse to trigger
+    digitalWrite(trig, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trig, LOW);
+    
+    // Read echo pulse duration
+    long duration = pulseIn(echo, HIGH, 30000);  // Timeout after 30ms (max ~5m range)
+    
+    if (duration == 0) {
+        // Timeout or no echo - return last known good value or max distance
+        return 50.0f;  // Return maxDist if sensor fails
+    }
+    
+    // Calculate distance in cm
+    // Speed of sound = 340 m/s = 0.034 cm/μs
+    // Distance = (duration * speed) / 2 (divide by 2 because sound travels there and back)
+    float distance = (duration * 0.034) / 2.0f;
+    
+    return distance;
+}
+
+
+// -----------------------------
+// Activate feeding servo
+// -----------------------------
+void feedToTargetPortion() {
+    if (!weightSensor.isReady()) {
+        Serial.println("Weight sensor not ready.");
+        return;
+    }
+
+    float current = weightSensor.getSmoothedWeight();
+    float target  = weightSensor.getTargetPortion();
+
+    if (target <= 0) {
+        Serial.println("Target portion not set.");
+        return;
+    }
+
+    if (current >= target) {
+        Serial.println("Bowl already contains enough food. No feeding needed.");
+        return;
+    }
+
+    if (dispenser.getState() != Dispenser::IDLE) {
+        Serial.println("Dispenser busy.");
+        return;
+    }
+
+    bool ok = dispenser.dispenseToPortion(
+        target,
+        [](){ return weightSensor.getSmoothedWeight(); },
+        [](){ return storage.getEstimatedWeight(); }
+    );
+
+    if (ok) {
+        Serial.println("Feeding started.");
+    } else {
+        Serial.println("Failed to start feeding.");
+    }
+}
+
+// -----------------------------
+// Serial command handler
+// -----------------------------
+void handleSerialCommands() {
+    if (Serial.available() > 0) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        command.toLowerCase();
+
+        if (command == "feed") {
+            // // Trigger dispense to target portion
+            // float target = weightSensor.getTargetPortion();
+            // float current = weightSensor.getWeight();
+            
+            // Serial.print("Current weight: ");
+            // Serial.print(current);
+            // Serial.print("g, Target: ");
+            // Serial.print(target);
+            // Serial.println("g");
+            
+            // if (dispenser.dispenseToPortion(
+            //     target,
+            //     [](){ return weightSensor.getWeight(); },
+            //     [](){ return storage.getEstimatedWeight(); }
+            // )) {
+            //     Serial.println("Dispensing started!");
+            // } else {
+            //     if (current >= target) {
+            //         Serial.println("Already at or above target portion. No dispensing needed.");
+            //     } else {
+            //         Serial.println("Cannot start dispensing (dispenser busy or error).");
+            //     }
+            // }
+            feedToTargetPortion();
+        }
+        else if (command == "status") {
+            // Show current status
+            Serial.println("=== Status ===");
+            Serial.print("Current weight: ");
+            Serial.print(weightSensor.getSmoothedWeight());
+            Serial.println("g");
+            Serial.print("Target portion: ");
+            Serial.print(weightSensor.getTargetPortion());
+            Serial.println("g");
+            
+            float remaining = weightSensor.getTargetPortion() - weightSensor.getSmoothedWeight();
+            if (remaining > 0) {
+                Serial.print("Remaining needed: ");
+                Serial.print(remaining);
+                Serial.println("g");
+            } else {
+                Serial.println("Target portion reached or exceeded.");
+            }
+            
+            // Storage information
+            float distance = readUltrasonicDistance();
+            Serial.print("Storage distance: ");
+            Serial.print(distance);
+            Serial.print("cm | ");
+            Serial.print("Storage: ");
+            Serial.print(storage.getRemainingPercent());
+            Serial.print("% (");
+            Serial.print(storage.getEstimatedWeight());
+            Serial.println("g estimated)");
+            
+            Serial.print("Dispenser state: ");
+            switch (dispenser.getState()) {
+                case Dispenser::IDLE:
+                    Serial.println("IDLE");
+                    break;
+                case Dispenser::DISPENSING:
+                    Serial.println("DISPENSING");
+                    break;
+                case Dispenser::DONE:
+                    Serial.println("DONE");
+                    break;
+                case Dispenser::ERROR:
+                    Serial.println("ERROR");
+                    break;
+            }
+            Serial.println("==============");
+        }
+        else if (command == "tare") {
+            // Re-tare the scale
+            Serial.println("Taring scale...");
+            weightSensor.tareScale();
+            Serial.println("Scale tared.");
+        }
+        else if (command.startsWith("set ")) {
+            // Set target portion: "set 500"
+            float newTarget = command.substring(4).toFloat();
+            if (newTarget > 0) {
+                weightSensor.setTargetPortion(newTarget);
+                Serial.print("Target portion set to: ");
+                Serial.print(newTarget);
+                Serial.println("g");
+            } else {
+                Serial.println("Invalid target value. Usage: set 500");
+            }
+        }
+        else if (command == "help" || command == "?") {
+            // Show help
+            Serial.println("=== Available Commands ===");
+            Serial.println("feed        - Dispense to target portion");
+            Serial.println("status      - Show current status");
+            Serial.println("tare        - Re-tare the scale");
+            Serial.println("set <value> - Set target portion (e.g., set 500)");
+            Serial.println("help        - Show this help");
+            Serial.println("========================");
+        }
+        else if (command.length() > 0) {
+            Serial.print("Unknown command: ");
+            Serial.println(command);
+            Serial.println("Type 'help' for available commands.");
+        }
+    }
+}
+
+// -----------------------------
 // Setup
 // -----------------------------
 void setup() {
@@ -146,7 +334,13 @@ void setup() {
     Serial.println("feeder id: " + feederId);
     
     weightSensor.setup(dt, sck);
+    weightSensor.setTargetPortionFromUser();
+
     dispenser.setup();
+    
+    // Initialize storage to 100% full for testing (prevents ERROR state)
+    // Will be updated live by ultrasonic sensor in loop()
+    storage.update(2.0f);  // 2cm = minDist = full container
     
     if (!startWifi()) {
         Serial.println("restarting...");
@@ -172,14 +366,66 @@ void loop() {
     // Update MQTT
     mqttManager.loop();
 
+    // Read ultrasonic sensor and update storage
+    float distance = readUltrasonicDistance();
+    storage.update(distance);
+
     // Update dispenser
     dispenser.loop();
 
-    // Basic monitoring
-    if (weightSensor.isReady()) {
-        Serial.print("Weight (g): ");
-        Serial.println(weightSensor.getSmoothedWeight());
+    // Handle serial commands
+    handleSerialCommands();
+
+    // Basic monitoring (reduced frequency - only print every 2 seconds)
+    static unsigned long lastPrint = 0;
+    unsigned long now = millis();
+    if (now - lastPrint >= 500) {  // Print every 2 seconds instead of every loop
+        lastPrint = now;
+        if (weightSensor.isReady()) {
+            Serial.print("Weight (g): ");
+            Serial.print(weightSensor.getSmoothedWeight());
+            Serial.print(" / Target: ");
+            Serial.print(weightSensor.getTargetPortion());
+            Serial.print("g | State: ");
+            switch (dispenser.getState()) {
+                case Dispenser::IDLE: Serial.print("IDLE"); break;
+                case Dispenser::DISPENSING: Serial.print("DISPENSING"); break;
+                case Dispenser::DONE: Serial.print("DONE"); break;
+                case Dispenser::ERROR: Serial.print("ERROR"); break;
+            }
+            Serial.println();
+        }
     }
 
-    // mqttManager.publish("event", "fed");
+    // PUBLISH STORAGE PERCENTAGE
+    // static unsigned long lastStoragePublish = 0;
+    // unsigned long now = millis();
+
+    // if (now - lastStoragePublish >= 5000) { // every 5 seconds
+    //     lastStoragePublish = now;
+
+    //     mqttManager.publish(
+    //         "storage/percent",
+    //         String(storage.getRemainingPercent()),
+    //         true
+    //     );
+
+    //     mqttManager.publish(
+    //         "storage/grams",
+    //         String(storage.getEstimatedWeight()),
+    //         true
+    //     );
+
+    //     mqttManager.publish(
+    //         "storage/low",
+    //         storage.isLow() ? "true" : "false",
+    //         true
+    //     );
+
+    //     mqttManager.publish(
+    //         "storage/empty",
+    //         storage.isEmpty() ? "true" : "false",
+    //         true
+    //     );
+    // }
 }

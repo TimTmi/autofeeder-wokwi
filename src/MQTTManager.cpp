@@ -6,6 +6,7 @@
 extern Dispenser dispenser;
 extern WeightSensor weightSensor;
 extern Storage storage;
+extern void feedToTargetPortion();
 
 MQTTManager::MQTTManager(PubSubClient& c): client(c) {}
 
@@ -44,11 +45,64 @@ bool MQTTManager::connect() {
 void MQTTManager::onConnected() {
     client.subscribe(buildTopic("cmd").c_str());
     publish("status", "online", true);
+
+    publishTargetPortion();
+    publishBowlStatus();
+    publishWeight();
+    publishStorageStatus();
 }
 
 bool MQTTManager::publish(const String& sub, const String& payload, bool retained) {
     if (!client.connected()) return false;
     return client.publish(buildTopic(sub).c_str(), payload.c_str(), retained);
+}
+
+void MQTTManager::publishBowlStatus() {
+    const bool hasFood = weightSensor.hasFoodInBowl();
+    String payload = hasFood ? "has_food" : "empty";
+
+    Serial.print("[MQTT] bowl → ");
+    Serial.println(payload);
+
+    publish("bowl", payload, true);
+}
+
+void MQTTManager::publishTargetPortion() {
+    Serial.print("[MQTT] portion → ");
+    Serial.println(weightSensor.getTargetPortion());
+
+    publish("portion", String(weightSensor.getTargetPortion()), true);
+}
+
+void MQTTManager::publishWeight() {
+    float w = weightSensor.getSmoothedWeight();
+
+    Serial.print("[MQTT] weight → ");
+    Serial.println(w);
+
+    publish("weight", String(w), false);
+}
+
+void MQTTManager::publishStorageStatus() {
+    float percent = storage.getRemainingPercent();
+    float weight  = storage.getEstimatedWeight();
+
+    String state = "OK";
+    if (storage.isEmpty()) state = "EMPTY";
+    else if (storage.isLow()) state = "LOW";
+
+    Serial.print("[MQTT] storage percent → ");
+    Serial.println(percent);
+
+    Serial.print("[MQTT] storage weight → ");
+    Serial.println(weight);
+
+    Serial.print("[MQTT] storage state → ");
+    Serial.println(state);
+
+    publish("storage/percent", String(percent, 1), true);
+    publish("storage/weight", String((int)weight), true);
+    publish("storage/state", state, true);
 }
 
 String MQTTManager::buildTopic(const String& s) const {
@@ -68,15 +122,8 @@ void MQTTManager::callback(char* topic, byte* payload, unsigned int length) {
     if (t != buildTopic("cmd")) return;
 
     // feed command
-    if (msg.startsWith("feed")) {
-        int amount = msg.substring(4).toInt();
-        if (amount <= 0) return;
-
-        dispenser.dispense(
-            amount,
-            [](){ return weightSensor.getWeight(); },
-            [](){ return storage.getEstimatedWeight(); }
-        );
+    if (msg == "feed") {
+        feedToTargetPortion();
         return;
     }
 
