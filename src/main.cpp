@@ -391,10 +391,10 @@ void loop() {
         lastDispState = current;
 
         if (current == Dispenser::DONE) {
-            mqttManager.publish("event/feed/completed", "ok", false);
+            mqttManager.publish("feed_completed", "Feed Success", false);
         }
         else if (current == Dispenser::ERROR) {
-            mqttManager.publish("event/feed/failed", "runtime_error", false);
+            mqttManager.publish("feed_failed", "Feed Failed", false);
         }
     }
 
@@ -441,11 +441,11 @@ void loop() {
 
         // --- Publish individual topics ---
         mqttManager.publish("bowl", String(bowlWeight), false);
-        // mqttManager.publish("bowl/target_portion", String(targetPortion), true);
+        mqttManager.publish("bowl_target_portion", String(targetPortion), true);
 
-        mqttManager.publish("weight", String(storagePercent, 1), true);
-        // mqttManager.publish("storage/grams", String((int)storageWeight), true);
-        // mqttManager.publish("storage/state", storageState, true);
+        mqttManager.publish("storage_percent", String(storagePercent, 1), true);
+        mqttManager.publish("storage_currentWeight", String((int)storageWeight), true);
+        mqttManager.publish("storage_state", storageState, true);
 
         // Optional: Debug output
         Serial.print("[MQTT] Bowl: "); 
