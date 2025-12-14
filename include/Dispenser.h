@@ -19,6 +19,7 @@ public:
     bool dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void));
 
     State getState() const;
+    float getTargetWeight() const;
     void reset();
 
 private:
