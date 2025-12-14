@@ -411,6 +411,11 @@ void loop() {
     // Update dispenser
     dispenser.loop();
 
+    if (dispenser.getState() == Dispenser::State::DONE) {
+        mqttManager.publish("fed", String(dispenser.getTargetWeight()));
+        dispenser.setState(Dispenser::State::IDLE);
+    }
+
     // Handle serial commands
     handleSerialCommands();
 
@@ -438,7 +443,7 @@ void loop() {
     // -------------------- Periodic status publishing --------------------
     static unsigned long lastStatusPublish = 0;
 
-    if (now - lastStatusPublish >= 5000) {  // every 2 seconds
+    if (now - lastStatusPublish >= 5000) {
         lastStatusPublish = now;
 
         // --- Bowl status ---
