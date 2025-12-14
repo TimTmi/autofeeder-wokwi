@@ -62,16 +62,16 @@ void WeightSensor::setUserPortion() {
 }
 
 bool WeightSensor::portionReached() {
-    return getSmoothedWeight() >= targetPortionGrams;
+    return getWeight() >= targetPortionGrams;
 }
 
 void WeightSensor::setPortionFromBowl() {
     const float threshold = 0.2;
-    float lastWeight = getSmoothedWeight();
+    float lastWeight = getWeight();
     unsigned long stableTime = 0;
 
     while (stableTime < 1000) {
-        float current = getSmoothedWeight();
+        float current = getWeight();
         if (abs(current - lastWeight) < threshold) {
             stableTime += 50;
         } else {
