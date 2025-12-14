@@ -10,7 +10,7 @@ public:
         DONE,
         ERROR
     };
-
+    
     Dispenser(int pin, unsigned long timeout = 5000);
 
     void setup();
