@@ -46,10 +46,9 @@ void MQTTManager::onConnected() {
     client.subscribe(buildTopic("cmd").c_str());
     publish("status", "online", true);
 
-    publishTargetPortion();
-    publishBowlStatus();
-    publishWeight();
-    publishStorageStatus();
+    // publishTargetPortion();
+    // publishBowlStatus();
+    // publishWeight();
 }
 
 bool MQTTManager::publish(const String& sub, const String& payload, bool retained) {
