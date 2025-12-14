@@ -100,6 +100,7 @@ bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(
     return true;
 }
 
+void Dispenser::setState(Dispenser::State newState) { state = newState; }
 Dispenser::State Dispenser::getState() const { return state; }
 float Dispenser::getTargetWeight() const { return targetWeight; }
 void Dispenser::reset() { state = IDLE; }

@@ -413,6 +413,7 @@ void loop() {
 
     if (dispenser.getState() == Dispenser::State::DONE) {
         mqttManager.publish("fed", String(dispenser.getTargetWeight()));
+        dispenser.setState(Dispenser::State::IDLE);
     }
 
     // Handle serial commands
