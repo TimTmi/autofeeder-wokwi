@@ -169,7 +169,7 @@ void feedToTargetPortion() {
         Serial.println("Weight sensor not ready."); 
         return; 
     } 
-    float current = weightSensor.getSmoothedWeight();
+    float current = weightSensor.getWeight();
     float target  = weightSensor.getTargetPortion();
 
     if (target <= 0) { 
@@ -189,7 +189,7 @@ void feedToTargetPortion() {
 
     bool ok = dispenser.dispenseToPortion(
         target,
-        [](){ return weightSensor.getSmoothedWeight(); },
+        [](){ return weightSensor.getWeight(); },
         [](){ return storage.getEstimatedWeight(); }
     );
 
@@ -276,13 +276,13 @@ void handleSerialCommands() {
             // Show current status
             Serial.println("=== Status ===");
             Serial.print("Current weight: ");
-            Serial.print(weightSensor.getSmoothedWeight());
+            Serial.print(weightSensor.getWeight());
             Serial.println("g");
             Serial.print("Target portion: ");
             Serial.print(weightSensor.getTargetPortion());
             Serial.println("g");
             
-            float remaining = weightSensor.getTargetPortion() - weightSensor.getSmoothedWeight();
+            float remaining = weightSensor.getTargetPortion() - weightSensor.getWeight();
             if (remaining > 0) {
                 Serial.print("Remaining needed: ");
                 Serial.print(remaining);
@@ -426,7 +426,7 @@ void loop() {
     //     lastPrint = now;
     //     if (weightSensor.isReady()) {
     //         Serial.print("Weight (g): ");
-    //         Serial.print(weightSensor.getSmoothedWeight());
+    //         Serial.print(weightSensor.getWeight());
     //         Serial.print(" / Target: ");
     //         Serial.print(weightSensor.getTargetPortion());
     //         Serial.print("g | State: ");
@@ -447,7 +447,7 @@ void loop() {
         lastStatusPublish = now;
 
         // --- Bowl status ---
-        float bowlWeight = weightSensor.getSmoothedWeight();
+        float bowlWeight = weightSensor.getWeight();
         float targetPortion = weightSensor.getTargetPortion();
 
         // --- Storage status ---
@@ -458,12 +458,12 @@ void loop() {
         else if (storage.isLow()) storageState = "LOW";
 
         // --- Publish individual topics ---
-        mqttManager.publish("bowl/current_weight", String(bowlWeight), false);
-        mqttManager.publish("bowl/target_portion", String(targetPortion), true);
+        mqttManager.publish("bowl", String(bowlWeight), false);
+        // mqttManager.publish("bowl/target_portion", String(targetPortion), true);
 
-        mqttManager.publish("storage/percent", String(storagePercent, 1), true);
-        mqttManager.publish("storage/grams", String((int)storageWeight), true);
-        mqttManager.publish("storage/state", storageState, true);
+        mqttManager.publish("weight", String(storagePercent, 1), true);
+        // mqttManager.publish("storage/grams", String((int)storageWeight), true);
+        // mqttManager.publish("storage/state", storageState, true);
 
         // Optional: Debug output
         Serial.print("[MQTT] Bowl: "); 

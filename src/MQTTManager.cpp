@@ -74,7 +74,7 @@ void MQTTManager::publishTargetPortion() {
 }
 
 void MQTTManager::publishWeight() {
-    float w = weightSensor.getSmoothedWeight();
+    float w = weightSensor.getWeight();
 
     Serial.print("[MQTT] weight → ");
     Serial.println(w);
