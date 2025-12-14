@@ -200,6 +200,9 @@ void feedToTargetPortion() {
         Serial.println("Failed to start feeding."); 
     }
 
+    // float current = weightSensor.getSmoothedWeight();
+    // float target  = weightSensor.getTargetPortion();
+
     // mqttManager.publish("event/feed/request", "target_portion", false);
     // mqttManager.publish("event/feed/target", String(target), false);
     // mqttManager.publish("event/feed/current", String(current), false);
@@ -228,6 +231,11 @@ void feedToTargetPortion() {
     //     return;
     // }
 
+    // bool ok = dispenser.dispenseToPortion(
+    //     target,
+    //     [](){ return weightSensor.getSmoothedWeight(); },
+    //     [](){ return storage.getEstimatedWeight(); }
+    // );
 
     // if (ok) {
     //     mqttManager.publish("event/feed/result", "started", false);
