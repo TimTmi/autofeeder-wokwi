@@ -82,9 +82,17 @@ bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(
 
     // Pre-check: get current weight
     float currentWeight = weightFunc();
+    float availableFood = storageFunc();
     
     // If already at or above target, don't activate
     if (currentWeight >= targetPortionGrams) {
+        return false;
+    }
+
+    // storage empty or invalid
+    if (availableFood <= 0) {
+        state = ERROR;
+        errorTime = millis();
         return false;
     }
 

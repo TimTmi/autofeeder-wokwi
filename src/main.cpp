@@ -165,70 +165,26 @@ float readUltrasonicDistance() {
 // Activate feeding servo
 // -----------------------------
 void feedToTargetPortion() {
-    if (!weightSensor.isReady()) { 
-        Serial.println("Weight sensor not ready."); 
-        return; 
-    } 
-    float current = weightSensor.getSmoothedWeight();
-    float target  = weightSensor.getTargetPortion();
-
-    if (target <= 0) { 
-        Serial.println("Target portion not set."); 
-        return; 
-    }
-
-    if (current >= target) { 
-        Serial.println("Bowl already contains enough food. No feeding needed."); 
-        return; 
-    }
-
-    if (dispenser.getState() != Dispenser::IDLE) { 
-        Serial.println("Dispenser busy."); 
-        return; 
-    }
-
-    bool ok = dispenser.dispenseToPortion(
-        target,
-        [](){ return weightSensor.getSmoothedWeight(); },
-        [](){ return storage.getEstimatedWeight(); }
-    );
-
-    if (ok) { 
-        Serial.println("Feeding started."); 
-    }
-    else { 
-        Serial.println("Failed to start feeding."); 
-    }
-
+    // if (!weightSensor.isReady()) { 
+    //     Serial.println("Weight sensor not ready."); 
+    //     return; 
+    // } 
     // float current = weightSensor.getSmoothedWeight();
     // float target  = weightSensor.getTargetPortion();
 
-    // mqttManager.publish("event/feed/request", "target_portion", false);
-    // mqttManager.publish("event/feed/target", String(target), false);
-    // mqttManager.publish("event/feed/current", String(current), false);
-
-    // if (!weightSensor.isReady()) {
-    //     mqttManager.publish("event/feed/result", "rejected", false);
-    //     mqttManager.publish("event/feed/reason", "sensor_not_ready", false);
-    //     return;
+    // if (target <= 0) { 
+    //     Serial.println("Target portion not set."); 
+    //     return; 
     // }
 
-    // if (target <= 0) {
-    //     mqttManager.publish("event/feed/result", "rejected", false);
-    //     mqttManager.publish("event/feed/reason", "target_not_set", false);
-    //     return;
+    // if (current >= target) { 
+    //     Serial.println("Bowl already contains enough food. No feeding needed."); 
+    //     return; 
     // }
 
-    // if (current >= target) {
-    //     mqttManager.publish("event/feed/result", "skipped", false);
-    //     mqttManager.publish("event/feed/reason", "already_sufficient", false);
-    //     return;
-    // }
-
-    // if (dispenser.getState() != Dispenser::IDLE) {
-    //     mqttManager.publish("event/feed/result", "rejected", false);
-    //     mqttManager.publish("event/feed/reason", "dispenser_busy", false);
-    //     return;
+    // if (dispenser.getState() != Dispenser::IDLE) { 
+    //     Serial.println("Dispenser busy."); 
+    //     return; 
     // }
 
     // bool ok = dispenser.dispenseToPortion(
@@ -237,12 +193,54 @@ void feedToTargetPortion() {
     //     [](){ return storage.getEstimatedWeight(); }
     // );
 
-    // if (ok) {
-    //     mqttManager.publish("event/feed/result", "started", false);
-    // } else {
-    //     mqttManager.publish("event/feed/result", "failed", false);
-    //     mqttManager.publish("event/feed/reason", "start_failed", false);
+    // if (ok) { 
+    //     Serial.println("Feeding started."); 
     // }
+    // else { 
+    //     Serial.println("Failed to start feeding."); 
+    // }
+
+    //mqttManager.publish("event/feed_requested", "true", false);
+
+    if (!weightSensor.isReady()) {
+        mqttManager.publish("feed_rejected", "sensor_not_ready", false);
+        return;
+    }
+
+    float current = weightSensor.getSmoothedWeight();
+    float target  = weightSensor.getTargetPortion();
+
+    if (target <= 0) {
+        mqttManager.publish("feed_rejected", "target_not_set", false);
+        return;
+    }
+
+    if (current >= target) {
+        mqttManager.publish("feed_skipped", "already_sufficient", false);
+        return;
+    }
+
+    if (storage.isEmpty()) {
+        mqttManager.publish("feed_rejected", "storage_empty", false);
+        return;
+    }
+
+    if (dispenser.getState() != Dispenser::IDLE) {
+        mqttManager.publish("feed_rejected", "dispenser_busy", false);
+        return;
+    }
+
+    bool ok = dispenser.dispenseToPortion(
+        target,
+        [](){ return weightSensor.getSmoothedWeight(); },
+        [](){ return storage.getEstimatedWeight(); }
+    );
+
+    if (ok) {
+        mqttManager.publish("feed_started", String(target), false);
+    } else {
+        mqttManager.publish("feed_failed", "start_failed", false);
+    }
 }
 
 // -----------------------------
@@ -419,9 +417,23 @@ void loop() {
     // Update dispenser
     dispenser.loop();
 
-    if (dispenser.getState() == Dispenser::State::DONE) {
-        mqttManager.publish("fed", String(dispenser.getTargetWeight()));
-        dispenser.setState(Dispenser::State::IDLE);
+    // if (dispenser.getState() == Dispenser::State::DONE) {
+    //     mqttManager.publish("fed", String(dispenser.getTargetWeight()));
+    //     dispenser.setState(Dispenser::State::IDLE);
+    // }
+
+    static Dispenser::State lastDispState = Dispenser::IDLE;
+    Dispenser::State current = dispenser.getState();
+
+    if (current != lastDispState) {
+        lastDispState = current;
+
+        if (current == Dispenser::DONE) {
+            mqttManager.publish("event/feed/completed", "ok", false);
+        }
+        else if (current == Dispenser::ERROR) {
+            mqttManager.publish("event/feed/failed", "runtime_error", false);
+        }
     }
 
     // Handle serial commands
