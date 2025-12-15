@@ -1,8 +1,10 @@
 #include "Dispenser.h"
 
-Dispenser::Dispenser(int pin, unsigned long timeout): pin(pin), timeout(timeout) {}
+// Declare dispensor class
+Dispenser::Dispenser(int pin, unsigned long timeout) : pin(pin), timeout(timeout) {}
 
-void Dispenser::setup() {
+void Dispenser::setup()
+{
     servo.attach(pin);
     stop();
 }
@@ -10,60 +12,47 @@ void Dispenser::setup() {
 void Dispenser::start() { servo.write(90); }
 void Dispenser::stop() { servo.write(0); }
 
-void Dispenser::loop() {
-    // if (state != DISPENSING) return;
-
-    // // Serial.print("Weight: ");
-    // // Serial.print(bowlGetter());
-    // // Serial.print(" | Storage est: ");
-    // // Serial.print(storageGetter());
-    // // Serial.print(" | Elapsed: ");
-    // // Serial.println(millis() - startTime);
-
-    // if (bowlGetter() >= targetWeight) {
-    //     stop();
-    //     state = DONE;
-    // }
-    // else if (storageGetter() <= 0) {
-    //     stop();
-    //     state = ERROR;
-    // }
-    // else if (millis() - startTime > timeout) {
-    //     stop();
-    //     state = ERROR;
-    // }
-
-    if (state == DISPENSING) {
-        if (bowlGetter() >= targetWeight) {
+void Dispenser::loop()
+{
+    if (state == DISPENSING)
+    {
+        if (bowlGetter() >= targetWeight)
+        {
             stop();
             state = DONE;
             doneTime = millis();
         }
-        else if (storageGetter() <= 0) {
+        else if (storageGetter() <= 0)
+        {
             stop();
             state = ERROR;
             errorTime = millis();
         }
-        else if (millis() - startTime > timeout) {
+        else if (millis() - startTime > timeout)
+        {
             stop();
             state = ERROR;
             errorTime = millis();
         }
     }
-    else if (state == DONE) {
-        if (millis() - doneTime > 500) {
+    else if (state == DONE)
+    {
+        if (millis() - doneTime > 500)
+        {
             state = IDLE;
         }
     }
-    else if (state == ERROR) {
+    else if (state == ERROR)
+    {
         // Testing recovery path
-        if (millis() - errorTime > 2000) {
+        if (millis() - errorTime > 2000)
+        {
             state = IDLE;
         }
     }
 }
 
-// Rollback for dispenser function 
+// Rollback for dispenser function
 // bool Dispenser::dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void)) {
 //     if (state != IDLE) return false;
 
@@ -78,20 +67,24 @@ void Dispenser::loop() {
 //     return true;
 // }
 
-bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void)) {
-    if (state != IDLE) return false;
+bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void))
+{
+    if (state != IDLE)
+        return false;
 
     // Pre-check: get current weight
     float currentWeight = weightFunc();
     float availableFood = storageFunc();
-    
+
     // If already at or above target, don't activate
-    if (currentWeight >= targetPortionGrams) {
+    if (currentWeight >= targetPortionGrams)
+    {
         return false;
     }
 
     // storage empty or invalid
-    if (availableFood <= 0) {
+    if (availableFood <= 0)
+    {
         state = ERROR;
         errorTime = millis();
         return false;
