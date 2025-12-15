@@ -487,11 +487,11 @@ void loop()
 
         if (current == Dispenser::DONE)
         {
-            mqttManager.publish("feed_completed", "Feed Success", false);
+            mqttManager.publish("feed_completed", String(dispenser.getTargetWeight()), false);
         }
         else if (current == Dispenser::ERROR)
         {
-            mqttManager.publish("feed_failed", "Feed Failed", false);
+            mqttManager.publish("feed_failed", String(dispenser.getTargetWeight()), false);
         }
     }
 
