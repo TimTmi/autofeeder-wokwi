@@ -29,7 +29,7 @@ WiFiClientSecure espClient;
 // MQTT configuration
 // -----------------------------
 constexpr char mqttHost[] = "a63c6d5a32cf4a67b9d6a209a8e13525.s1.eu.hivemq.cloud";
-constexpr int mqttPort = 8883;
+constexpr int mqttPort = 8883; //used for ESP
 constexpr char mqttUsername[] = "tmitmi";
 constexpr char mqttPassword[] = "Tm123456";
 PubSubClient client(espClient);

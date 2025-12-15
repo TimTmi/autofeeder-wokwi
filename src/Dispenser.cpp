@@ -63,6 +63,7 @@ void Dispenser::loop() {
     }
 }
 
+// Rollback for dispenser function 
 // bool Dispenser::dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void)) {
 //     if (state != IDLE) return false;
 
