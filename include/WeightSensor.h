@@ -11,7 +11,7 @@ private:
     float calibrationFactor = 0.42;
 
     // Portion logic
-    float targetPortionGrams = 0;  
+    float targetPortionGrams = 500;  
 
     // Smoothing
     float smoothedWeight = 0;  

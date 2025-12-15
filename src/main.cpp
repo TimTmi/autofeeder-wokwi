@@ -540,7 +540,7 @@ void loop()
             storageState = "LOW";
 
         // --- Publish individual topics ---
-        mqttManager.publish("bowl", String(bowlWeight), false);
+        mqttManager.publish("bowl", String(bowlWeight / 10), false);
         mqttManager.publish("weight", String(storagePercent, 1), false);
 
         // Optional: Debug output
