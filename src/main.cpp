@@ -18,8 +18,8 @@ constexpr int echo = 4;
 constexpr int dt = 18;
 constexpr int sck = 5;
 constexpr int SERVO_PIN = 19;
-constexpr int BUTTON_PIN = 22;
-constexpr int LED_PIN = 23;
+constexpr int BUTTON_PIN = 21;
+constexpr int LED_PIN = 17;
 
 // -----------------------------
 // WiFi configuration
@@ -42,7 +42,7 @@ MQTTManager mqttManager(client);
 Storage storage(2.0f, 30.0f, 2000.0f);  // minDist=2cm (full), maxDist=30cm (empty), maxWeight=2000g
 WeightSensor weightSensor;
 Dispenser dispenser(SERVO_PIN);
-Button feedButton(22, true);  // active HIGH with pulldown
+Button feedButton(21, true);  // active HIGH with pulldown
 
 // -----------------------------
 // Feeder ID
