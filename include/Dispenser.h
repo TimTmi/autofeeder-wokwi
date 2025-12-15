@@ -2,15 +2,18 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-class Dispenser {
+class Dispenser
+{
 public:
-    enum State {
+    //Four states of the dispenser
+    enum State
+    {
         IDLE,
         DISPENSING,
         DONE,
         ERROR
     };
-    
+
     Dispenser(int pin, unsigned long timeout = 5000);
 
     void setup();
