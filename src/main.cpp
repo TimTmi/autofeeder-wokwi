@@ -345,7 +345,7 @@ void setup() {
     Serial.println("feeder id: " + feederId);
     
     weightSensor.setup(dt, sck);
-    weightSensor.setTargetPortionFromUser();
+    // weightSensor.setTargetPortionFromUser();
 
     feedButton.setup();
 
