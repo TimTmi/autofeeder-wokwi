@@ -8,6 +8,7 @@
 #include "Storage.h"
 #include "WeightSensor.h"
 #include "Dispenser.h"
+#include "Button.h"
 
 // -----------------------------
 // Pin configuration
@@ -17,6 +18,7 @@ constexpr int echo = 4;
 constexpr int dt = 18;
 constexpr int sck = 5;
 constexpr int SERVO_PIN = 19;
+constexpr int BUTTON_PIN = 22;
 
 // -----------------------------
 // WiFi configuration
@@ -39,6 +41,7 @@ MQTTManager mqttManager(client);
 Storage storage(2.0f, 30.0f, 2000.0f);  // minDist=2cm (full), maxDist=30cm (empty), maxWeight=2000g
 WeightSensor weightSensor;
 Dispenser dispenser(SERVO_PIN);
+Button feedButton(22, true);  // active HIGH with pulldown
 
 // -----------------------------
 // Feeder ID
@@ -340,6 +343,8 @@ void setup() {
     weightSensor.setup(dt, sck);
     weightSensor.setTargetPortionFromUser();
 
+    feedButton.setup();
+
     dispenser.setup();
     
     // Initialize storage to 100% full for testing (prevents ERROR state)
@@ -375,6 +380,14 @@ void loop() {
     // Read ultrasonic sensor and update storage
     float distance = readUltrasonicDistance();
     storage.update(distance);
+
+    // Feed button 
+    feedButton.loop();
+
+    if (feedButton.wasPressed()) {
+        Serial.println("[BUTTON] Feed requested");
+        feedToTargetPortion();
+    }
 
     // Update dispenser
     dispenser.loop();
@@ -441,11 +454,11 @@ void loop() {
 
         // --- Publish individual topics ---
         mqttManager.publish("bowl", String(bowlWeight), false);
-        mqttManager.publish("bowl_target_portion", String(targetPortion), true);
+        mqttManager.publish("bowl_target_portion", String(targetPortion), false);
 
-        mqttManager.publish("storage_percent", String(storagePercent, 1), true);
-        mqttManager.publish("storage_currentWeight", String((int)storageWeight), true);
-        mqttManager.publish("storage_state", storageState, true);
+        mqttManager.publish("storage_percent", String(storagePercent, 1), false);
+        mqttManager.publish("storage_currentWeight", String((int)storageWeight), false);
+        mqttManager.publish("storage_state", storageState, false);
 
         // Optional: Debug output
         Serial.print("[MQTT] Bowl: "); 
@@ -457,4 +470,8 @@ void loop() {
 
         Serial.print("[MQTT] Storage: "); Serial.print(storagePercent); Serial.print("%, "); Serial.print(storageWeight); Serial.print("g, "); Serial.println(storageState);
     }
+
+
+    // Serial.print(digitalRead(22));
+    // delay(300);
 }

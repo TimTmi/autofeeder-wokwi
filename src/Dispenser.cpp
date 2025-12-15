@@ -63,19 +63,19 @@ void Dispenser::loop() {
     }
 }
 
-bool Dispenser::dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void)) {
-    if (state != IDLE) return false;
+// bool Dispenser::dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void)) {
+//     if (state != IDLE) return false;
 
-    targetWeight = grams;
-    bowlGetter = weightFunc;
-    storageGetter = storageFunc;
+//     targetWeight = grams;
+//     bowlGetter = weightFunc;
+//     storageGetter = storageFunc;
 
-    start();
-    startTime = millis();
-    state = DISPENSING;
+//     start();
+//     startTime = millis();
+//     state = DISPENSING;
 
-    return true;
-}
+//     return true;
+// }
 
 bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void)) {
     if (state != IDLE) return false;
