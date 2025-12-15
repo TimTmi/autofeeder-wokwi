@@ -36,6 +36,15 @@
       "left": 8.2,
       "rotate": 180,
       "attrs": { "value": "1000" }
+    },
+    { "type": "wokwi-led", "id": "led1", "top": -61.2, "left": 90.2, "attrs": { "color": "red" } },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": -14.95,
+      "left": 113.8,
+      "rotate": 180,
+      "attrs": { "value": "1000" }
     }
   ],
   "connections": [
@@ -59,13 +68,19 @@
     [ "servo1:PWM", "esp:D19", "green", [ "h-556.8", "v48.2" ] ],
     [ "r1:1", "bb1:bn.6", "red", [ "v0", "h28.8", "v86.4", "h-105.6" ] ],
     [ "bb1:11b.h", "esp:D22", "green", [ "v28.8", "h28.8", "v86.4" ] ],
+    [ "bb1:9b.g", "bb1:bp.6", "red", [ "v0" ] ],
     [ "btn1:1.l", "bb1:11t.e", "", [ "$bb" ] ],
     [ "btn1:2.l", "bb1:9t.e", "", [ "$bb" ] ],
     [ "btn1:1.r", "bb1:11b.f", "", [ "$bb" ] ],
     [ "btn1:2.r", "bb1:9b.f", "", [ "$bb" ] ],
+    [ "led1:A", "bb1:22b.f", "", [ "$bb" ] ],
+    [ "led1:C", "bb1:21b.f", "", [ "$bb" ] ],
     [ "r1:1", "bb1:17b.g", "", [ "$bb" ] ],
     [ "r1:2", "bb1:11b.g", "", [ "$bb" ] ],
-    [ "bb1:9b.g", "esp:3V3", "red", [ "v0", "h-192", "v297.6", "h153.6", "v-48" ] ]
+    [ "r2:1", "bb1:28b.g", "", [ "$bb" ] ],
+    [ "r2:2", "bb1:22b.g", "", [ "$bb" ] ],
+    [ "bb1:21b.g", "bb1:bn.16", "red", [ "v0" ] ],
+    [ "esp:D23", "r2:1", "green", [ "h66.71", "v-38.4", "h172.8" ] ]
   ],
   "dependencies": {}
 }
