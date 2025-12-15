@@ -13,10 +13,10 @@
 // -----------------------------
 // Pin configuration
 // -----------------------------
-constexpr int trig = 2;
-constexpr int echo = 4;
+constexpr int trig = 13;
+constexpr int echo = 27;
 constexpr int dt = 18;
-constexpr int sck = 5;
+constexpr int sck = 14;
 constexpr int SERVO_PIN = 19;
 constexpr int BUTTON_PIN = 21;
 constexpr int LED_PIN = 17;
@@ -334,7 +334,8 @@ void setup() {
     Serial.begin(9600);
     Serial.println("setting up...");
 
-    feederId = loadOrCreateFeederId();
+    // feederId = loadOrCreateFeederId();
+    feederId = generateFeederId();
 
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
@@ -431,10 +432,12 @@ void loop() {
         lastDispState = current;
 
         if (current == Dispenser::DONE) {
-            mqttManager.publish("feed_completed", "Feed Success", false);
+            mqttManager.publish("feed_completed", String(dispenser.getTargetWeight()), false);
+            // dispenser.setState(Dispenser::State::IDLE);
         }
         else if (current == Dispenser::ERROR) {
-            mqttManager.publish("feed_failed", "Feed Failed", false);
+            mqttManager.publish("feed_failed", String(dispenser.getTargetWeight()), false);
+            // dispenser.setState(Dispenser::State::IDLE);
         }
     }
 
@@ -466,6 +469,7 @@ void loop() {
     static unsigned long lastStatusPublish = 0;
 
     if (now - lastStatusPublish >= 5000) {
+        Serial.println("distance: " + String(distance));
         lastStatusPublish = now;
 
         // --- Bowl status ---
@@ -481,11 +485,7 @@ void loop() {
 
         // --- Publish individual topics ---
         mqttManager.publish("bowl", String(bowlWeight), false);
-        mqttManager.publish("bowl_target_portion", String(targetPortion), false);
-
-        mqttManager.publish("storage_percent", String(storagePercent, 1), false);
-        mqttManager.publish("storage_currentWeight", String((int)storageWeight), false);
-        mqttManager.publish("storage_state", storageState, false);
+        mqttManager.publish("weight", String(storagePercent, 1), false);
 
         // Optional: Debug output
         Serial.print("[MQTT] Bowl: "); 
