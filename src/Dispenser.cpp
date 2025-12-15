@@ -64,7 +64,19 @@ void Dispenser::loop() {
 }
 
 // Rollback for dispenser function 
+// bool Dispenser::dispense(int grams, float (*weightFunc)(void), float (*storageFunc)(void)) {
+//     if (state != IDLE) return false;
 
+//     targetWeight = grams;
+//     bowlGetter = weightFunc;
+//     storageGetter = storageFunc;
+
+//     start();
+//     startTime = millis();
+//     state = DISPENSING;
+
+//     return true;
+// }
 
 bool Dispenser::dispenseToPortion(float targetPortionGrams, float (*weightFunc)(void), float (*storageFunc)(void)) {
     if (state != IDLE) return false;
