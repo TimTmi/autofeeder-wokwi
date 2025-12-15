@@ -19,6 +19,7 @@ constexpr int dt = 18;
 constexpr int sck = 5;
 constexpr int SERVO_PIN = 19;
 constexpr int BUTTON_PIN = 22;
+constexpr int LED_PIN = 23;
 
 // -----------------------------
 // WiFi configuration
@@ -335,6 +336,9 @@ void setup() {
 
     feederId = loadOrCreateFeederId();
 
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+
     pinMode(trig, OUTPUT);
     pinMode(echo, INPUT);
 
@@ -380,6 +384,29 @@ void loop() {
     // Read ultrasonic sensor and update storage
     float distance = readUltrasonicDistance();
     storage.update(distance);
+
+    // -------------------- Storage status LED --------------------
+    static unsigned long lastBlink = 0;
+    static bool ledState = false;
+
+    if (storage.isEmpty()) {
+        // EMPTY → LED solid ON
+        digitalWrite(LED_PIN, HIGH);
+    }
+    else if (storage.isLow()) {
+        // LOW → LED blinking
+        unsigned long now = millis();
+        if (now - lastBlink >= 500) {   // 500 ms blink rate
+            lastBlink = now;
+            ledState = !ledState;
+            digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+        }
+    }
+    else {
+        // OK → LED OFF
+        digitalWrite(LED_PIN, LOW);
+        ledState = false;
+    }
 
     // Feed button 
     feedButton.loop();
