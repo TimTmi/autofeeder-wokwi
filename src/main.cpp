@@ -40,6 +40,7 @@ PubSubClient client(espClient);
 // -----------------------------
 MQTTManager mqttManager(client);
 Storage storage(2.0f, 30.0f, 2000.0f); // minDist=2cm (full), maxDist=30cm (empty), maxWeight=2000g
+String storageState = "OK";
 WeightSensor weightSensor;
 Dispenser dispenser(SERVO_PIN);
 Button feedButton(21, true); // active HIGH with pulldown
@@ -533,11 +534,15 @@ void loop()
         // --- Storage status ---
         float storagePercent = storage.getRemainingPercent();
         float storageWeight = storage.getEstimatedWeight();
-        String storageState = "OK";
-        if (storage.isEmpty())
+        
+        if (storage.isEmpty() && storageState != "EMPTY") {
             storageState = "EMPTY";
-        else if (storage.isLow())
+            mqttManager.publish("storage_empty", "empty");
+        }
+        else if (storage.isLow() && storageState == "OK") {
             storageState = "LOW";
+            mqttManager.publish("storage_low", "low");
+        }
 
         // --- Publish individual topics ---
         mqttManager.publish("bowl", String(bowlWeight / 10), false);
