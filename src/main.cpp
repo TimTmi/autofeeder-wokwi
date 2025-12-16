@@ -197,25 +197,25 @@ void feedToTargetPortion()
 
     if (target_weight <= 0)
     {
-        mqttManager.publish("feed_rejected", "target_not_set", false);
+        mqttManager.publish("feed_rejected_no_portion", String(dispenser.getTargetWeight()), false);
         return;
     }
 
     if (current_weight >= target_weight)
     {
-        mqttManager.publish("feed_skipped", "already_sufficient", false);
+        mqttManager.publish("feed_skipped", String(dispenser.getTargetWeight()), false);
         return;
     }
 
     if (storage.isEmpty())
     {
-        mqttManager.publish("feed_rejected", "storage_empty", false);
+        mqttManager.publish("feed_rejected_empty_storage", String(dispenser.getTargetWeight()), false);
         return;
     }
 
     if (dispenser.getState() != Dispenser::IDLE)
     {
-        mqttManager.publish("feed_rejected", "dispenser_busy", false);
+        mqttManager.publish("feed_rejected_busy", String(dispenser.getTargetWeight()), false);
         return;
     }
 
